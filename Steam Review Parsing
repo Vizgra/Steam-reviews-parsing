@@ -1,0 +1,104 @@
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium import webdriver
+import time
+import sys
+from bs4 import BeautifulSoup
+import re
+import pandas as pd
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+
+browser = webdriver.Chrome(ChromeDriverManager().install())
+browser.get('https://steamcommunity.com/app/234650/reviews/?browsefilter=toprated&snr=1_5_100010_&filterLanguage=russian') #russian
+
+#page scrolling
+
+pre_scroll_height = browser.execute_script('return document.body.scrollHeight;')
+run_time, max_run_time = 0, 1
+while True:
+    iteration_start = time.time()
+    browser.execute_script('window.scrollTo(0, 100*document.body.scrollHeight);')
+    post_scroll_height = browser.execute_script('return document.body.scrollHeight;')
+    scrolled = post_scroll_height != pre_scroll_height
+    timed_out = run_time >= max_run_time
+
+    if scrolled:
+        run_time = 0
+        pre_scroll_height = post_scroll_height
+    elif not scrolled and not timed_out:
+        run_time += time.time() - iteration_start
+    elif not scrolled and timed_out:
+        break
+        
+time.sleep(5)
+
+page_code = browser.page_source
+
+#collecting information
+soup = BeautifulSoup(page_code)
+all_inf = soup.findAll('div', {'class':'apphub_Card modalContentLink interactable'})
+
+posts_inf_0 = []
+
+for element in all_inf:
+    posts_inf_0.append(element.text)
+    
+posts_inf_1 = []
+
+for element in posts_inf_0:
+    element = re.sub(r'\n|\t', '', element)
+    posts_inf_1.append(element)
+    
+#information filtering and table creation
+games_on_account = []
+for i in [i[i.rfind('product')-6:i.rfind('product')] for i in posts_inf_1]:
+    a = ''
+    for j in i:
+        if j.isdigit():
+            a += j
+    games_on_account.append(a)
+
+ingame_time = [i.split('Recommended')[1].split(' on recordPosted: ')[0] for i in posts_inf_1]
+
+ingame_time_0 = re.findall(r'funny\t\t\t\t0\n\n\n\n\n\n\nRecommended\n\d+.\d+', element)
+    if len(ingame_time_0) > 0:
+        for num in hrs_0:
+            ingame_time_1 = re.sub(r'funny\t\t\t\t0\n\n\n\n\n\n\nRecommended\n', '', num)
+            ingame_time.append(hrs_1)
+    else:
+        ingame_time.append(0)
+        
+recomendation = []
+for i in [i.split('Recommended')[0].lower() for i in posts_inf_1]:
+    if 'not' in i:
+        recomendation.append('no')
+    else:
+        recomendation.append('yes')
+        
+helpful = [i.split(' pe')[0] for i in posts_inf_1]
+
+name = []
+for i in [i.split('\xa0')[-1].split('products')[0] for i in posts_inf_1]:
+    b = ''
+    for j in i:
+        if j.isdigit() == False:
+            b += j
+    name.append(b)
+    
+review = [i[i.find(', 20')+6:].split('\xa0')[0] for i in posts_inf_1]
+
+date = [i.split('recordPosted: ')[1][:i.split('recordPosted: ')[1].find(', 20')+6] for i in posts_inf_1]
+
+reviews_inf_df = pd.DataFrame(columns = ['Имя', 'Время в игре', 'Оценка', 'Количество игр на аккаунте', 'Посчитали отзыв полезным', 'Отзыв'])
+reviews_inf_df['Имя'] = name
+reviews_inf_df['Время в игре'] = ingame_time
+reviews_inf_df['Оценка'] = recomendation
+reviews_inf_df['Количество игр на аккаунте'] = games_on_account
+reviews_inf_df['Посчитали отзыв полезным'] = helpful
+reviews_inf_df['Отзыв'] = review
+
+reviews_inf_df
