@@ -102,3 +102,5 @@ reviews_inf_df['Посчитали отзыв полезным'] = helpful
 reviews_inf_df['Отзыв'] = review
 
 reviews_inf_df
+
+reviews_inf_df.to_excel('First_Shadowrun Returns_отзывы_рус.xlsx')
